@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Meshy True Model Capture
 // @namespace    https://github.com/sckwiid/meshy-download
-// @version      1.0.1
+// @version      1.0.2
 // @description  Capture les vrais GLB decryptes par le viewer Meshy au document-start.
 // @match        https://meshy.ai/*
 // @match        https://www.meshy.ai/*
+// @match        https://*.meshy.ai/*
 // @run-at       document-start
 // @grant        none
 // @noframes
@@ -14,6 +15,7 @@
   "use strict";
 
   var page = window;
+  if (!isAllowedMeshyHost(page.location.hostname)) return;
   if (page.__meshyTrueModelCapture) return;
   page.__meshyTrueModelCapture = true;
 
@@ -21,10 +23,19 @@
   var HOST_HINTS = ["cdn-models", "assets.meshy", "amazonaws.com", "storage.googleapis.com", "cdn.sketchfab.com"];
   var OriginalWorker = page.Worker;
   var originalFetch = page.fetch ? page.fetch.bind(page) : null;
-  var originalCreateObjectURL = page.URL.createObjectURL.bind(page.URL);
+  var originalCreateObjectURL = page.URL && page.URL.createObjectURL ? page.URL.createObjectURL.bind(page.URL) : null;
   var models = new Map();
   var panel = null;
   var pendingRender = false;
+  var lastHref = page.location.href;
+
+  function isAllowedMeshyHost(hostname) {
+    return hostname === "meshy.ai" || hostname.endsWith(".meshy.ai");
+  }
+
+  function isModelPage() {
+    return page.location.pathname.indexOf("/3d-models/") !== -1;
+  }
 
   function text(value) {
     return value == null ? "" : String(value);
@@ -117,6 +128,10 @@
 
   function reportBlob(blob, source, knownUrl) {
     if (!blob || !blob.size) return;
+    if (!originalCreateObjectURL && page.URL && page.URL.createObjectURL) {
+      originalCreateObjectURL = page.URL.createObjectURL.bind(page.URL);
+    }
+    if (!knownUrl && !originalCreateObjectURL) return;
     var blobUrl = knownUrl || originalCreateObjectURL(blob);
     addModel({
       url: blobUrl,
@@ -229,6 +244,7 @@
   }
 
   function hookCreateObjectURL() {
+    if (!page.URL || !page.URL.createObjectURL || !originalCreateObjectURL) return;
     page.URL.createObjectURL = function (blob) {
       var url = originalCreateObjectURL(blob);
       inspectBlob(blob, "createObjectURL", url);
@@ -251,6 +267,7 @@
 
   function ensurePanel() {
     if (panel) return;
+    if (!isModelPage()) return;
     if (!page.document.body) {
       schedulePanelMount();
       return;
@@ -341,6 +358,7 @@
   hookCreateObjectURL();
 
   function schedulePanelMount() {
+    if (!isModelPage()) return;
     if (schedulePanelMount.pending) return;
     schedulePanelMount.pending = true;
     var mount = function () {
@@ -358,6 +376,12 @@
   }
 
   schedulePanelMount();
+
+  page.setInterval(function () {
+    if (page.location.href === lastHref) return;
+    lastHref = page.location.href;
+    if (isModelPage()) schedulePanelMount();
+  }, 1000);
 
   console.log("[Meshy True Capture] Hooks Worker/fetch/createObjectURL actifs", page.location.href);
 })();
