@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Meshy Model Download</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="tool-surface" aria-labelledby="app-title">
+        <header class="topbar">
+          <div class="brand">
+            <span class="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" role="img">
+                <path d="M12 2.6 20.2 7.2v9.6L12 21.4 3.8 16.8V7.2L12 2.6Z"></path>
+                <path d="M4.2 7.4 12 12l7.8-4.6M12 12v9M8 5l8.1 4.7"></path>
+              </svg>
+            </span>
+            <div>
+              <h1 id="app-title">Meshy Model Download</h1>
+              <p>Scanner statique pour liens 3D et capture assistée.</p>
+            </div>
+          </div>
+          <div class="top-actions">
+            <button class="icon-button" id="copy-bookmarklet" type="button" aria-label="Copier le bookmarklet" title="Copier le bookmarklet">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+            <a class="icon-button" href="https://github.com/" aria-label="GitHub Pages" title="GitHub Pages">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2C6.5 2 2 6.6 2 12.3c0 4.5 2.9 8.3 6.8 9.7.5.1.7-.2.7-.5v-1.9c-2.8.6-3.4-1.2-3.4-1.2-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 0 1.6 1.1 1.6 1.1.9 1.6 2.4 1.1 2.9.9.1-.7.4-1.1.7-1.4-2.2-.3-4.6-1.1-4.6-5.1 0-1.1.4-2.1 1.1-2.8-.1-.3-.5-1.4.1-2.8 0 0 .9-.3 2.9 1.1.8-.2 1.7-.3 2.6-.3s1.8.1 2.6.3c2-1.4 2.9-1.1 2.9-1.1.6 1.4.2 2.5.1 2.8.7.8 1.1 1.7 1.1 2.8 0 4-2.4 4.8-4.6 5.1.4.3.7 1 .7 2v2.9c0 .3.2.6.7.5 4-1.4 6.8-5.2 6.8-9.7C22 6.6 17.5 2 12 2Z"></path>
+              </svg>
+            </a>
+          </div>
+        </header>
+
+        <div class="mode-tabs" role="tablist" aria-label="Modes">
+          <button class="tab is-active" id="tab-link" type="button" role="tab" aria-selected="true" aria-controls="link-panel">Lien</button>
+          <button class="tab" id="tab-capture" type="button" role="tab" aria-selected="false" aria-controls="capture-panel">Capture</button>
+        </div>
+
+        <section id="link-panel" class="panel is-active" role="tabpanel" aria-labelledby="tab-link">
+          <form class="scan-form" id="scan-form">
+            <label for="target-url">Lien Meshy, page publique ou fichier 3D direct</label>
+            <div class="url-row">
+              <input id="target-url" name="target-url" type="url" placeholder="https://..." autocomplete="url" required>
+              <button class="primary-button" type="submit">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7"></circle>
+                  <path d="m20 20-3.5-3.5"></path>
+                </svg>
+                Analyser
+              </button>
+            </div>
+          </form>
+
+          <div class="status-line" id="status-line" role="status">Prêt.</div>
+
+          <div class="result-toolbar">
+            <div>
+              <strong id="result-count">0 modèle</strong>
+              <span id="result-context">aucun lien chargé</span>
+            </div>
+            <div class="toolbar-actions">
+              <button class="secondary-button" id="open-target" type="button" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M14 3h7v7"></path>
+                  <path d="M10 14 21 3"></path>
+                  <path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"></path>
+                </svg>
+                Ouvrir
+              </button>
+              <button class="secondary-button" id="download-all" type="button" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <path d="M7 10l5 5 5-5"></path>
+                  <path d="M12 15V3"></path>
+                </svg>
+                Tout
+              </button>
+              <button class="secondary-button" id="export-list" type="button" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path>
+                  <path d="M14 2v6h6"></path>
+                  <path d="M8 13h8M8 17h5"></path>
+                </svg>
+                JSON
+              </button>
+            </div>
+          </div>
+
+          <div class="model-list" id="model-list" aria-live="polite">
+            <div class="empty-state">
+              <div class="empty-visual" aria-hidden="true">
+                <svg viewBox="0 0 80 80">
+                  <path d="M40 8 68 24v32L40 72 12 56V24L40 8Z"></path>
+                  <path d="M13 24 40 40l27-16M40 40v31M27 16l27 16"></path>
+                </svg>
+              </div>
+              <p>Aucun modèle détecté.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="capture-panel" class="panel" role="tabpanel" aria-labelledby="tab-capture" hidden>
+          <div class="capture-grid">
+            <div class="capture-block">
+              <h2>Bookmarklet de capture</h2>
+              <p>À utiliser sur la page Meshy quand le scan direct est bloqué par le navigateur.</p>
+              <a class="bookmarklet" id="bookmarklet-link" href="#">Capturer les modèles 3D</a>
+              <div class="capture-actions">
+                <button class="primary-button" id="copy-bookmarklet-inline" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  Copier
+                </button>
+                <button class="secondary-button" id="copy-console-script" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m8 9 3 3-3 3"></path>
+                    <path d="M13 15h3"></path>
+                    <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                  </svg>
+                  Script
+                </button>
+              </div>
+            </div>
+
+            <div class="capture-block">
+              <h2>Compatibilité</h2>
+              <ul class="compat-list">
+                <li><span class="dot ok"></span>Liens directs `.glb`, `.gltf`, `.obj`, `.fbx`, `.stl`, `.ply`, `.dae`, `.usdz`</li>
+                <li><span class="dot ok"></span>Pages publiques lisibles avec CORS</li>
+                <li><span class="dot warn"></span>Pages Meshy chiffrées : capture depuis l’onglet Meshy</li>
+                <li><span class="dot no"></span>Aucun serveur, proxy ou clé API requis</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <template id="model-row-template">
+      <article class="model-row">
+        <div class="model-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2.5 21 7.5v9L12 21.5 3 16.5v-9L12 2.5Z"></path>
+            <path d="M3.5 7.7 12 12.5l8.5-4.8M12 12.5v8.5"></path>
+          </svg>
+        </div>
+        <div class="model-meta">
+          <strong class="model-name"></strong>
+          <span class="model-url"></span>
+        </div>
+        <span class="model-badge"></span>
+        <button class="icon-button download-one" type="button" aria-label="Télécharger" title="Télécharger">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <path d="M7 10l5 5 5-5"></path>
+            <path d="M12 15V3"></path>
+          </svg>
+        </button>
+      </article>
+    </template>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="src/app.js" defer></script>
+  </body>
+</html>
