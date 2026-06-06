@@ -76,14 +76,36 @@ function normaliseCandidateUrl(raw, baseUrl) {
 }
 
 function getModelExtension(url) {
-  const lower = url.toLowerCase();
-  return MODEL_EXTENSIONS.find(ext => lower.includes(ext)) || "";
+  let pathname = "";
+  try {
+    pathname = new URL(url, window.location.href).pathname.toLowerCase();
+  } catch {
+    pathname = url.toLowerCase().split(/[?#]/)[0];
+  }
+  return MODEL_EXTENSIONS.find(ext => pathname.endsWith(ext)) || "";
 }
 
 function isLikelyModelUrl(url) {
-  const lower = url.toLowerCase();
-  if (MODEL_EXTENSIONS.some(ext => lower.includes(ext))) return true;
-  return MODEL_HOST_HINTS.some(hint => lower.includes(hint)) && lower.includes("signature");
+  let parsed;
+  try {
+    parsed = new URL(url, window.location.href);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol === "blob:") return true;
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+
+  const pathname = parsed.pathname.toLowerCase();
+  const filename = pathname.split("/").filter(Boolean).pop() || "";
+  const hasTerminalExt = MODEL_EXTENSIONS.some(ext => pathname.endsWith(ext));
+  const hasSignedAssetHint = MODEL_HOST_HINTS.some(hint => parsed.hostname.toLowerCase().includes(hint)) &&
+    /(?:x-amz-signature|signature|token|expires|policy)=/i.test(parsed.search) &&
+    hasTerminalExt;
+
+  if (!hasTerminalExt && !hasSignedAssetHint) return false;
+  if (!filename || filename.startsWith(".") || /^u00[0-9a-f]/i.test(filename)) return false;
+  if (/\.html?$/i.test(filename) || filename === "model.json") return false;
+  return true;
 }
 
 function isMeshyPage(url) {

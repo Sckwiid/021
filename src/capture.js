@@ -14,6 +14,7 @@
   var models = new Map();
   var panel = null;
   var scanTimer = 0;
+  var ignoredDomCount = 0;
 
   function text(value) {
     return value == null ? "" : String(value);
@@ -25,16 +26,43 @@
   }
 
   function extensionFromUrl(url) {
-    var low = text(url).toLowerCase();
+    var pathname = "";
+    try {
+      pathname = new URL(text(url), location.href).pathname.toLowerCase();
+    } catch (e) {
+      pathname = text(url).toLowerCase().split(/[?#]/)[0];
+    }
     return GOOD_EXTS.find(function (ext) {
-      return low.indexOf(ext) !== -1;
+      return pathname.endsWith(ext);
     }) || ".glb";
   }
 
-  function looksLikeModelUrl(url) {
-    var low = text(url).toLowerCase();
-    if (GOOD_EXTS.some(function (ext) { return low.indexOf(ext) !== -1; })) return true;
-    return HOST_HINTS.some(function (hint) { return low.indexOf(hint) !== -1; }) && low.indexOf("signature") !== -1;
+  function isValidModelUrl(url, source) {
+    var parsed;
+    try {
+      parsed = new URL(text(url), location.href);
+    } catch (e) {
+      return false;
+    }
+
+    if (parsed.protocol === "blob:") return source !== "dom";
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+
+    var pathname = parsed.pathname.toLowerCase();
+    var filename = pathname.split("/").filter(Boolean).pop() || "";
+    var hasTerminalExt = GOOD_EXTS.some(function (ext) {
+      return pathname.endsWith(ext);
+    });
+    var hasSignedAssetHint = HOST_HINTS.some(function (hint) {
+      return parsed.hostname.toLowerCase().indexOf(hint) !== -1;
+    }) && /(?:x-amz-signature|signature|token|expires|policy)=/i.test(parsed.search) && hasTerminalExt;
+
+    if (!hasTerminalExt && !hasSignedAssetHint) return false;
+    if (!filename || filename.charAt(0) === "." || /^u00[0-9a-f]/i.test(filename)) return false;
+    if (/\.html?$/i.test(filename) || filename === "model.json") return false;
+    if (source === "dom" && parsed.hostname === location.hostname && location.hostname.indexOf("meshy.ai") !== -1) return false;
+
+    return true;
   }
 
   function normalizeUrl(raw, base) {
@@ -78,12 +106,12 @@
     var match;
     while ((match = absolute.exec(decoded))) {
       var url = normalizeUrl(match[0], base);
-      if (url && looksLikeModelUrl(url)) found.push(url);
+      if (url && isValidModelUrl(url, "dom")) found.push(url);
     }
     while ((match = relative.exec(decoded))) {
       if (!GOOD_EXTS.some(function (ext) { return match[0].toLowerCase().indexOf(ext) !== -1; })) continue;
       var relUrl = normalizeUrl(match[0], base);
-      if (relUrl && looksLikeModelUrl(relUrl)) found.push(relUrl);
+      if (relUrl && isValidModelUrl(relUrl, "dom")) found.push(relUrl);
     }
     return found;
   }
@@ -104,7 +132,10 @@
 
   function addUrl(url, source) {
     var normalized = normalizeUrl(url, location.href);
-    if (!normalized || !looksLikeModelUrl(normalized)) return;
+    if (!normalized || !isValidModelUrl(normalized, source)) {
+      if (source === "dom") ignoredDomCount++;
+      return;
+    }
     addModel({ url: normalized, source: source || "url" });
   }
 
@@ -206,8 +237,8 @@
       var url = normalizeUrl(rawUrl || "", location.href);
       return originalFetch.apply(this, arguments).then(function (response) {
         var responseUrl = response.url || url;
-        if (looksLikeModelUrl(url) || looksLikeModelUrl(responseUrl)) addUrl(responseUrl || url, "fetch-url");
-        if (looksLikeModelUrl(url) || looksLikeModelUrl(responseUrl)) {
+        if (isValidModelUrl(url, "fetch-url") || isValidModelUrl(responseUrl, "fetch-url")) addUrl(responseUrl || url, "fetch-url");
+        if (isValidModelUrl(url, "fetch-url") || isValidModelUrl(responseUrl, "fetch-url")) {
           response.clone().arrayBuffer().then(function (buffer) {
             inspectBuffer(buffer, "fetch");
           }).catch(function () {});
@@ -233,7 +264,7 @@
     XMLHttpRequest.prototype.send = function () {
       this.addEventListener("load", function () {
         var url = this.responseURL || this.__meshCaptureUrl;
-        if (looksLikeModelUrl(url)) addUrl(url, "xhr-url");
+        if (isValidModelUrl(url, "xhr-url")) addUrl(url, "xhr-url");
         try {
           if (this.response instanceof ArrayBuffer) inspectBuffer(this.response, "xhr");
           if (this.response instanceof Blob) inspectBlob(this.response, "xhr");
@@ -255,12 +286,55 @@
       extractUrls(html, location.href).forEach(function (url) {
         addUrl(url, "dom");
       });
+      render();
     } catch (e) {}
   }
 
-  function scheduleDomScan() {
+  function scanPerformance() {
+    try {
+      performance.getEntriesByType("resource").forEach(function (entry) {
+        var url = entry && entry.name;
+        if (!url) return;
+        if (text(url).indexOf("blob:") === 0) {
+          fetch(url).then(function (response) {
+            return response.blob();
+          }).then(function (blob) {
+            inspectBlob(blob, "performance", url);
+          }).catch(function () {});
+          return;
+        }
+        if (isValidModelUrl(url, "performance")) {
+          addUrl(url, "performance");
+          fetch(url).then(function (response) {
+            return response.clone().arrayBuffer();
+          }).then(function (buffer) {
+            inspectBuffer(buffer, "performance");
+          }).catch(function () {});
+        }
+      });
+    } catch (e) {}
+  }
+
+  function rescanAll() {
+    ignoredDomCount = 0;
+    scanPerformance();
+    scanDom();
+  }
+
+  function scheduleDomScan(mutations) {
+    if (panel && mutations && mutations.length) {
+      var onlyPanelChanges = Array.prototype.every.call(mutations, function (mutation) {
+        if (panel.contains(mutation.target)) return true;
+        return Array.prototype.every.call(mutation.addedNodes || [], function (node) {
+          return node === panel || panel.contains(node);
+        }) && Array.prototype.every.call(mutation.removedNodes || [], function (node) {
+          return node === panel || panel.contains(node);
+        });
+      });
+      if (onlyPanelChanges) return;
+    }
     clearTimeout(scanTimer);
-    scanTimer = setTimeout(scanDom, 450);
+    scanTimer = setTimeout(rescanAll, 450);
   }
 
   function download(entry, index) {
@@ -278,13 +352,19 @@
     if (!panel) return;
     var items = Array.from(models.values());
     var count = panel.querySelector("[data-count]");
+    var hint = panel.querySelector("[data-hint]");
     var list = panel.querySelector("[data-list]");
     count.textContent = items.length + " modele" + (items.length > 1 ? "s" : "");
+    hint.textContent = items.length
+      ? "Vrais blobs ou fichiers detectes"
+      : "Lance la capture avant de charger le viewer, puis clique Scan";
     list.textContent = "";
     if (!items.length) {
       var empty = document.createElement("div");
       empty.className = "md-empty";
-      empty.textContent = "Aucun modele detecte pour le moment.";
+      empty.textContent = ignoredDomCount
+        ? "Aucun vrai fichier detecte. Les faux liens de page ont ete ignores."
+        : "Aucun modele detecte pour le moment.";
       list.appendChild(empty);
       return;
     }
@@ -314,12 +394,12 @@
   function createPanel() {
     panel = document.createElement("div");
     panel.id = "meshy-capture-panel";
-    panel.innerHTML = '<style>#meshy-capture-panel{position:fixed;right:18px;bottom:18px;z-index:2147483647;width:min(390px,calc(100vw - 28px));font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#20211f;background:#fff;border:1px solid #d9d6cc;border-radius:8px;box-shadow:0 18px 45px rgba(0,0,0,.24);overflow:hidden}#meshy-capture-panel *{box-sizing:border-box}#meshy-capture-panel .md-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:#f8f7f3;border-bottom:1px solid #d9d6cc}#meshy-capture-panel .md-title{display:grid;gap:2px}#meshy-capture-panel .md-title strong{font-size:14px;line-height:1.2}#meshy-capture-panel .md-title span{font-size:12px;color:#676b63}#meshy-capture-panel .md-actions{display:flex;gap:6px}#meshy-capture-panel button{border:1px solid #d9d6cc;border-radius:8px;background:#fff;color:#20211f;min-height:32px;padding:0 10px;font:700 12px system-ui;cursor:pointer}#meshy-capture-panel button:hover{border-color:#9ccac6;background:#e5f3f1;color:#095b56}#meshy-capture-panel .md-primary{background:#0f7771;border-color:#0f7771;color:#fff}#meshy-capture-panel .md-primary:hover{background:#095b56;color:#fff}#meshy-capture-panel .md-list{max-height:290px;overflow:auto;display:grid;gap:8px;padding:10px;background:#fff}#meshy-capture-panel .md-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px;border:1px solid #d9d6cc;border-radius:8px;background:#fff}#meshy-capture-panel .md-meta{min-width:0;display:grid;gap:4px}#meshy-capture-panel .md-meta strong{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#meshy-capture-panel .md-meta span,#meshy-capture-panel .md-empty{font-size:12px;color:#676b63}#meshy-capture-panel .md-empty{padding:24px;text-align:center;background:#f8f7f3;border:1px dashed #cbc7bb;border-radius:8px}</style><div class="md-head"><div class="md-title"><strong>Meshy Capture</strong><span data-count>0 modele</span></div><div class="md-actions"><button type="button" data-rescan>Scan</button><button type="button" class="md-primary" data-all>Tout</button><button type="button" data-close>Fermer</button></div></div><div class="md-list" data-list></div>';
+    panel.innerHTML = '<style>#meshy-capture-panel{position:fixed;right:18px;bottom:18px;z-index:2147483647;width:min(430px,calc(100vw - 28px));font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#20211f;background:#fff;border:1px solid #d9d6cc;border-radius:8px;box-shadow:0 18px 45px rgba(0,0,0,.24);overflow:hidden}#meshy-capture-panel *{box-sizing:border-box}#meshy-capture-panel .md-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:#f8f7f3;border-bottom:1px solid #d9d6cc}#meshy-capture-panel .md-title{display:grid;gap:2px;min-width:0}#meshy-capture-panel .md-title strong{font-size:14px;line-height:1.2}#meshy-capture-panel .md-title span{font-size:12px;color:#676b63}#meshy-capture-panel .md-title small{font-size:11px;color:#b87912;line-height:1.25}#meshy-capture-panel .md-actions{display:flex;gap:6px;flex-shrink:0}#meshy-capture-panel button{border:1px solid #d9d6cc;border-radius:8px;background:#fff;color:#20211f;min-height:32px;padding:0 10px;font:700 12px system-ui;cursor:pointer}#meshy-capture-panel button:hover{border-color:#9ccac6;background:#e5f3f1;color:#095b56}#meshy-capture-panel .md-primary{background:#0f7771;border-color:#0f7771;color:#fff}#meshy-capture-panel .md-primary:hover{background:#095b56;color:#fff}#meshy-capture-panel .md-list{max-height:310px;overflow:auto;display:grid;gap:8px;padding:10px;background:#fff}#meshy-capture-panel .md-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px;border:1px solid #d9d6cc;border-radius:8px;background:#fff}#meshy-capture-panel .md-meta{min-width:0;display:grid;gap:4px}#meshy-capture-panel .md-meta strong{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#meshy-capture-panel .md-meta span,#meshy-capture-panel .md-empty{font-size:12px;color:#676b63}#meshy-capture-panel .md-empty{padding:24px;text-align:center;background:#f8f7f3;border:1px dashed #cbc7bb;border-radius:8px}</style><div class="md-head"><div class="md-title"><strong>Meshy Capture</strong><span data-count>0 modele</span><small data-hint>Lance la capture avant de charger le viewer, puis clique Scan</small></div><div class="md-actions"><button type="button" data-rescan>Scan</button><button type="button" class="md-primary" data-all>Tout</button><button type="button" data-close>Fermer</button></div></div><div class="md-list" data-list></div>';
     document.documentElement.appendChild(panel);
     panel.querySelector("[data-close]").addEventListener("click", function () {
       panel.style.display = "none";
     });
-    panel.querySelector("[data-rescan]").addEventListener("click", scanDom);
+    panel.querySelector("[data-rescan]").addEventListener("click", rescanAll);
     panel.querySelector("[data-all]").addEventListener("click", function () {
       Array.from(models.values()).forEach(function (entry, index) {
         setTimeout(function () {
@@ -341,7 +421,7 @@
   hookObjectUrl();
   hookXhr();
   createPanel();
-  scanDom();
+  rescanAll();
 
   try {
     new MutationObserver(scheduleDomScan).observe(document.documentElement, {

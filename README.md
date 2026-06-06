@@ -22,6 +22,8 @@ Pour les pages Meshy bloquées ou les modèles déchiffrés dans un Worker, util
 3. Lancez la capture depuis la page Meshy.
 4. Le panneau flottant affiche les modèles détectés et les boutons de téléchargement.
 
+Si le scanner de lien affiche un blocage navigateur pour une URL `meshy.ai`, c'est attendu : le site doit passer par **Capture**. Le script de capture filtre les faux liens présents dans le HTML de Meshy, comme `.stl`, `.USDZ`, `model.json` ou `u003e.stl`, qui ne sont pas de vrais fichiers téléchargeables.
+
 ## Fichiers
 
 - `index.html` : interface statique.
