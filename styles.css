@@ -168,6 +168,7 @@ h1 {
 
 .icon-button svg,
 .primary-button svg,
+.primary-link-button svg,
 .secondary-button svg {
   width: 18px;
   height: 18px;
@@ -260,6 +261,7 @@ input[type="url"]:focus {
 }
 
 .primary-button,
+.primary-link-button,
 .secondary-button {
   min-height: 42px;
   padding: 0 15px;
@@ -271,14 +273,19 @@ input[type="url"]:focus {
   white-space: nowrap;
 }
 
-.primary-button {
+.primary-button,
+.primary-link-button {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
+  text-decoration: none;
+  border-radius: 8px;
 }
 
 .primary-button:hover:not(:disabled),
-.primary-button:focus-visible {
+.primary-button:focus-visible,
+.primary-link-button:hover,
+.primary-link-button:focus-visible {
   background: var(--accent-dark);
   border-color: var(--accent-dark);
 }
@@ -442,7 +449,7 @@ input[type="url"]:focus {
 
 .capture-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 18px;
 }
 
@@ -478,6 +485,13 @@ input[type="url"]:focus {
   background: #fff6df;
   font-weight: 900;
   text-decoration: none;
+}
+
+.install-row {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
 }
 
 .compat-list {
@@ -580,8 +594,13 @@ input[type="url"]:focus {
   }
 
   .primary-button,
+  .primary-link-button,
   .secondary-button {
     width: 100%;
+  }
+
+  .install-row {
+    grid-template-columns: 1fr;
   }
 
   .model-row {

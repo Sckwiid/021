@@ -108,8 +108,30 @@
         <section id="capture-panel" class="panel" role="tabpanel" aria-labelledby="tab-capture" hidden>
           <div class="capture-grid">
             <div class="capture-block">
+              <h2>Script persistant recommandé</h2>
+              <p>Installe ce script dans Tampermonkey ou Violentmonkey. Il se lance au début du chargement Meshy, comme l’extension.</p>
+              <div class="install-row">
+                <a class="primary-link-button" id="install-userscript" href="src/meshy-capture.user.js">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <path d="M7 10l5 5 5-5"></path>
+                    <path d="M12 15V3"></path>
+                  </svg>
+                  Installer
+                </a>
+                <button class="secondary-button" id="copy-userscript" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  Copier
+                </button>
+              </div>
+            </div>
+
+            <div class="capture-block">
               <h2>Bookmarklet de capture</h2>
-              <p>À utiliser sur la page Meshy quand le scan direct est bloqué par le navigateur.</p>
+              <p>Mode de secours. Il peut arriver trop tard si le Worker Meshy a déjà chargé le vrai modèle.</p>
               <a class="bookmarklet" id="bookmarklet-link" href="#">Capturer les modèles 3D</a>
               <div class="capture-actions">
                 <button class="primary-button" id="copy-bookmarklet-inline" type="button">
@@ -135,7 +157,7 @@
               <ul class="compat-list">
                 <li><span class="dot ok"></span>Liens directs `.glb`, `.gltf`, `.obj`, `.fbx`, `.stl`, `.ply`, `.dae`, `.usdz`</li>
                 <li><span class="dot ok"></span>Pages publiques lisibles avec CORS</li>
-                <li><span class="dot warn"></span>Pages Meshy chiffrées : capture depuis l’onglet Meshy</li>
+                <li><span class="dot ok"></span>Pages Meshy chiffrées : script persistant à `document-start`</li>
                 <li><span class="dot no"></span>Aucun serveur, proxy ou clé API requis</li>
               </ul>
             </div>

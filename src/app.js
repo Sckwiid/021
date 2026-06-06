@@ -10,7 +10,8 @@ const MODEL_HOST_HINTS = [
 const state = {
   models: [],
   targetUrl: "",
-  captureSource: ""
+  captureSource: "",
+  userScriptSource: ""
 };
 
 const els = {
@@ -29,6 +30,8 @@ const els = {
   copyBookmarklet: document.querySelector("#copy-bookmarklet"),
   copyBookmarkletInline: document.querySelector("#copy-bookmarklet-inline"),
   copyConsoleScript: document.querySelector("#copy-console-script"),
+  installUserscript: document.querySelector("#install-userscript"),
+  copyUserscript: document.querySelector("#copy-userscript"),
   tabLink: document.querySelector("#tab-link"),
   tabCapture: document.querySelector("#tab-capture"),
   linkPanel: document.querySelector("#link-panel"),
@@ -320,6 +323,18 @@ async function loadCaptureSource() {
   els.bookmarkletLink.href = inlineBookmarklet();
 }
 
+async function loadUserScriptSource() {
+  const userScriptUrl = new URL("src/meshy-capture.user.js", document.baseURI);
+  els.installUserscript.href = userScriptUrl.href;
+  try {
+    const response = await fetch(userScriptUrl, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    state.userScriptSource = await response.text();
+  } catch {
+    state.userScriptSource = "";
+  }
+}
+
 function switchTab(next) {
   const isCapture = next === "capture";
   els.tabLink.classList.toggle("is-active", !isCapture);
@@ -386,6 +401,14 @@ function bindEvents() {
     const script = state.captureSource || externalBookmarklet().replace(/^javascript:/, "");
     copyText(script, "Script");
   });
+  els.copyUserscript.addEventListener("click", async () => {
+    if (!state.userScriptSource) await loadUserScriptSource();
+    if (state.userScriptSource) {
+      copyText(state.userScriptSource, "Script persistant");
+    } else {
+      copyText(new URL("src/meshy-capture.user.js", document.baseURI).href, "Lien du script persistant");
+    }
+  });
 
   els.tabLink.addEventListener("click", () => switchTab("link"));
   els.tabCapture.addEventListener("click", () => switchTab("capture"));
@@ -393,4 +416,5 @@ function bindEvents() {
 
 bindEvents();
 loadCaptureSource();
+loadUserScriptSource();
 renderModels();
