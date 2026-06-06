@@ -27,6 +27,8 @@ Pour les pages Meshy bloquées ou les modèles déchiffrés dans un Worker, util
 
 Cette méthode réplique la logique importante de l'extension : hook `Worker`, `fetch` et `URL.createObjectURL` à `document-start`, avant que Meshy charge le modèle.
 
+Si Meshy affiche une erreur en boucle après installation, supprimez l'ancienne version du script dans Tampermonkey puis installez la version `1.0.1` ou plus récente. Les hooks restent actifs à `document-start`, mais le panneau visuel attend maintenant que le DOM Meshy soit prêt pour ne pas casser l'hydratation de l'application.
+
 ### Méthode de secours : bookmarklet
 
 1. Copiez le bookmarklet ou le script.

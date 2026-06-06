@@ -1,18 +1,19 @@
 // ==UserScript==
 // @name         Meshy True Model Capture
 // @namespace    https://github.com/sckwiid/meshy-download
-// @version      1.0.0
+// @version      1.0.1
 // @description  Capture les vrais GLB decryptes par le viewer Meshy au document-start.
 // @match        https://meshy.ai/*
 // @match        https://www.meshy.ai/*
 // @run-at       document-start
-// @grant        unsafeWindow
+// @grant        none
+// @noframes
 // ==/UserScript==
 
 (function () {
   "use strict";
 
-  var page = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
+  var page = window;
   if (page.__meshyTrueModelCapture) return;
   page.__meshyTrueModelCapture = true;
 
@@ -57,7 +58,7 @@
       return host.indexOf(hint) !== -1 || parsed.href.toLowerCase().indexOf(hint) !== -1;
     });
 
-    return hasExt || hasMeshyAssetHint || /x-amz-signature|signature|asset|model/i.test(parsed.search);
+    return hasExt || hasMeshyAssetHint || /x-amz-signature|signature/i.test(parsed.search);
   }
 
   function extensionFor(url) {
@@ -250,15 +251,15 @@
 
   function ensurePanel() {
     if (panel) return;
-    if (!page.document.documentElement) {
-      page.setTimeout(ensurePanel, 50);
+    if (!page.document.body) {
+      schedulePanelMount();
       return;
     }
 
     panel = page.document.createElement("div");
     panel.id = "meshy-true-capture-panel";
     panel.innerHTML = '<style>#meshy-true-capture-panel{position:fixed;right:18px;bottom:18px;z-index:2147483647;width:min(430px,calc(100vw - 28px));font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#20211f;background:#fff;border:1px solid #d9d6cc;border-radius:8px;box-shadow:0 18px 45px rgba(0,0,0,.28);overflow:hidden}#meshy-true-capture-panel *{box-sizing:border-box}#meshy-true-capture-panel .mc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:#f8f7f3;border-bottom:1px solid #d9d6cc}#meshy-true-capture-panel .mc-title{display:grid;gap:2px;min-width:0}#meshy-true-capture-panel .mc-title strong{font-size:14px;line-height:1.2;color:#20211f}#meshy-true-capture-panel .mc-title span{font-size:12px;color:#676b63}#meshy-true-capture-panel .mc-title small{font-size:11px;color:#0f7771;line-height:1.25}#meshy-true-capture-panel .mc-actions{display:flex;gap:6px;flex-shrink:0}#meshy-true-capture-panel button{border:1px solid #d9d6cc;border-radius:8px;background:#fff;color:#20211f;min-height:32px;padding:0 10px;font:700 12px system-ui;cursor:pointer}#meshy-true-capture-panel button:hover{border-color:#9ccac6;background:#e5f3f1;color:#095b56}#meshy-true-capture-panel .mc-primary{background:#0f7771;border-color:#0f7771;color:#fff}#meshy-true-capture-panel .mc-primary:hover{background:#095b56;color:#fff}#meshy-true-capture-panel .mc-list{max-height:310px;overflow:auto;display:grid;gap:8px;padding:10px;background:#fff}#meshy-true-capture-panel .mc-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px;border:1px solid #d9d6cc;border-radius:8px;background:#fff}#meshy-true-capture-panel .mc-meta{min-width:0;display:grid;gap:4px}#meshy-true-capture-panel .mc-meta strong{font-size:13px;color:#20211f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#meshy-true-capture-panel .mc-meta span,#meshy-true-capture-panel .mc-empty{font-size:12px;color:#676b63}#meshy-true-capture-panel .mc-empty{padding:24px;text-align:center;background:#f8f7f3;border:1px dashed #cbc7bb;border-radius:8px}</style><div class="mc-head"><div class="mc-title"><strong>Meshy True Capture</strong><span data-count>0 modele</span><small data-hint>Charge le modele, puis attends la detection worker.</small></div><div class="mc-actions"><button type="button" data-scan>Scan</button><button type="button" class="mc-primary" data-all>Tout</button><button type="button" data-hide>Masquer</button></div></div><div class="mc-list" data-list></div>';
-    page.document.documentElement.appendChild(panel);
+    page.document.body.appendChild(panel);
     panel.querySelector("[data-hide]").addEventListener("click", function () {
       panel.style.display = "none";
     });
@@ -278,12 +279,11 @@
     pendingRender = true;
     page.setTimeout(function () {
       pendingRender = false;
-      render();
+      if (panel) render();
     }, 80);
   }
 
   function render() {
-    ensurePanel();
     if (!panel) return;
     var items = Array.from(models.values()).sort(function (a, b) {
       return priorityFor(b.source) - priorityFor(a.source) || (b.size || 0) - (a.size || 0);
@@ -339,13 +339,25 @@
   hookWorker();
   hookFetch();
   hookCreateObjectURL();
-  ensurePanel();
-  page.setTimeout(scanPerformance, 1800);
 
-  page.addEventListener("load", function () {
-    ensurePanel();
-    scanPerformance();
-  });
+  function schedulePanelMount() {
+    if (schedulePanelMount.pending) return;
+    schedulePanelMount.pending = true;
+    var mount = function () {
+      page.setTimeout(function () {
+        schedulePanelMount.pending = false;
+        ensurePanel();
+        render();
+      }, 1800);
+    };
+    if (page.document.readyState === "loading") {
+      page.document.addEventListener("DOMContentLoaded", mount, { once: true });
+    } else {
+      mount();
+    }
+  }
+
+  schedulePanelMount();
 
   console.log("[Meshy True Capture] Hooks Worker/fetch/createObjectURL actifs", page.location.href);
 })();
