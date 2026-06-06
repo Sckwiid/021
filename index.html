@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Model Downloader</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    header h1 {
+      font-size: 2rem;
+      color: #58a6ff;
+      letter-spacing: 1px;
+    }
+    header p {
+      color: #8b949e;
+      margin-top: 8px;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 28px;
+      width: 100%;
+      max-width: 720px;
+      margin-bottom: 24px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .input-row input {
+      flex: 1;
+      min-width: 200px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      color: #e6edf3;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-row input:focus { border-color: #58a6ff; }
+    .input-row input::placeholder { color: #484f58; }
+
+    button {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: background 0.2s, transform 0.1s;
+    }
+    button:active { transform: scale(0.97); }
+
+    .btn-primary { background: #238636; color: #fff; }
+    .btn-primary:hover { background: #2ea043; }
+    .btn-secondary { background: #21262d; color: #e6edf3; border: 1px solid #30363d; }
+    .btn-secondary:hover { background: #30363d; }
+    .btn-download { background: #1f6feb; color: #fff; }
+    .btn-download:hover { background: #388bfd; }
+    .btn-danger { background: #da3633; color: #fff; }
+    .btn-danger:hover { background: #f85149; }
+
+    #status {
+      margin-top: 14px;
+      font-size: 0.9rem;
+      color: #8b949e;
+      min-height: 20px;
+    }
+    #status.error { color: #f85149; }
+    #status.success { color: #3fb950; }
+    #status.loading { color: #d29922; }
+
+    /* Viewer */
+    #viewer-section { display: none; }
+
+    #viewer-wrapper {
+      position: relative;
+      width: 100%;
+      height: 420px;
+      background: #010409;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #30363d;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+
+    #viewer-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(13,17,23,0.8);
+      font-size: 0.9rem;
+      color: #8b949e;
+      pointer-events: none;
+      transition: opacity 0.4s;
+    }
+    #viewer-overlay.hidden { opacity: 0; }
+
+    .model-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .model-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .model-meta span { font-size: 0.85rem; color: #8b949e; }
+    .model-meta strong { color: #e6edf3; font-size: 1rem; }
+
+    .model-actions { display: flex; gap: 10px; }
+
+    /* Liste des modèles */
+    #models-list { display: flex; flex-direction: column; gap: 12px; }
+
+    .model-item {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .model-item .name { font-weight: 600; color: #58a6ff; word-break: break-all; }
+    .model-item .meta { font-size: 0.8rem; color: #8b949e; margin-top: 3px; }
+
+    .ext-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: #21262d;
+      color: #3fb950;
+      border: 1px solid #238636;
+      text-transform: uppercase;
+      margin-right: 8px;
+    }
+
+    .hint {
+      font-size: 0.82rem;
+      color: #484f58;
+      margin-top: 14px;
+      line-height: 1.6;
+    }
+    .hint code {
+      background: #21262d;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #79c0ff;
+    }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid #30363d;
+      border-top-color: #58a6ff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Drag & drop */
+    .drop-zone {
+      border: 2px dashed #30363d;
+      border-radius: 10px;
+      padding: 30px;
+      text-align: center;
+      color: #484f58;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      margin-top: 16px;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: #58a6ff;
+      color: #58a6ff;
+    }
+    .drop-zone input { display: none; }
+
+    @media (max-width: 520px) {
+      .input-row { flex-direction: column; }
+      .model-actions { width: 100%; justify-content: flex-end; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🧊 3D Model Downloader</h1>
+  <p>Colle un lien vers un modèle 3D — visualise et télécharge directement.</p>
+</header>
+
+<!-- Input URL -->
+<div class="card">
+  <div class="input-row">
+    <input type="text" id="url-input"
+      placeholder="https://... (lien .glb, .gltf, .obj, .fbx, .stl, .ply…)" />
+    <button class="btn-primary" onclick="loadModel()">⬇ Charger</button>
+  </div>
+  <div id="status"></div>
+
+  <!-- Drag & drop fichier local -->
+  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()"
+       ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="handleDragLeave(event)">
+    <input type="file" id="file-input" accept=".glb,.gltf,.obj,.fbx,.stl,.ply,.dae,.usdz" onchange="handleFileInput(event)" />
+    📂 Ou glisse un fichier 3D ici / cliquer pour ouvrir
+  </div>
+
+  <p class="hint">
+    Formats supportés : <code>GLB</code> <code>GLTF</code> <code>OBJ</code> <code>FBX</code> <code>STL</code> <code>PLY</code> <code>DAE</code> <code>USDZ</code><br/>
+    ⚠️ Le lien doit être accessible publiquement (pas de CORS bloquant). Pour Meshy ou S3, utilise un lien direct.
+  </p>
+</div>
+
+<!-- Viewer -->
+<div class="card" id="viewer-section">
+  <div id="viewer-wrapper">
+    <canvas id="three-canvas"></canvas>
+    <div id="viewer-overlay">Chargement du modèle…</div>
+  </div>
+  <div class="model-info">
+    <div class="model-meta">
+      <strong id="model-name">—</strong>
+      <span id="model-size">—</span>
+    </div>
+    <div class="model-actions">
+      <button class="btn-download" id="btn-dl" onclick="downloadCurrent()">⬇ Télécharger</button>
+      <button class="btn-secondary" onclick="resetViewer()">✕ Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Historique session -->
+<div class="card" id="history-card" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <span style="font-weight:700;font-size:1rem">📋 Modèles chargés</span>
+    <button class="btn-danger" style="padding:6px 14px;font-size:0.82rem" onclick="clearHistory()">Tout effacer</button>
+  </div>
+  <div id="models-list"></div>
+</div>
+
+<!-- Three.js + loaders via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/OBJLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/STLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/PLYLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/ColladaLoader.js"></script>
+
+<script>
+/* ─── Helpers ─────────────────────────────────────────────────────────── */
+const GOOD_EXTS = ['.glb','.gltf','.obj','.fbx','.stl','.ply','.dae','.usdz'];
+
+function getExt(url) {
+  try {
+    const p = new URL(url).pathname.toLowerCase().split('?')[0];
+    return GOOD_EXTS.find(e => p.endsWith(e)) || '';
+  } catch { return ''; }
+}
+
+function fmtSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1024/1024).toFixed(2) + ' MB';
+}
+
+function getName(url) {
+  try {
+    const raw = decodeURIComponent(new URL(url).pathname.split('/').pop()).split('?')[0];
+    return raw.length > 2 ? raw : 'model.glb';
+  } catch { return 'model.glb'; }
+}
+
+function setStatus(msg, type = '') {
+  const el = document.getElementById('status');
+  el.innerHTML = msg;
+  el.className = type;
+}
+
+/* ─── Historique session ──────────────────────────────────────────────── */
+const sessionModels = [];
+
+function addToHistory(entry) {
+  if (sessionModels.find(m => m.url === entry.url)) return;
+  sessionModels.push(entry);
+  renderHistory();
+}
+
+function renderHistory() {
+  const card = document.getElementById('history-card');
+  const list = document.getElementById('models-list');
+  if (!sessionModels.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  list.innerHTML = sessionModels.map((m, i) => `
+    <div class="model-item">
+      <div>
+        <div><span class="ext-badge">${m.ext.replace('.','').toUpperCase() || 'GLB'}</span>
+          <span class="name">${m.name}</span></div>
+        <div class="meta">${m.size ? fmtSize(m.size) + ' • ' : ''}${m.src || 'URL'}</div>
+      </div>
+      <div class="model-actions">
+        <button class="btn-secondary" style="padding:6px 12px;font-size:0.82rem"
+          onclick="reloadEntry(${i})">👁 Voir</button>
+        <button class="btn-download" style="padding:6px 12px;font-size:0.82rem"
+          onclick="downloadEntry(${i})">⬇</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function clearHistory() {
+  sessionModels.length = 0;
+  renderHistory();
+}
+
+function reloadEntry(i) {
+  const m = sessionModels[i];
+  document.getElementById('url-input').value = m.url;
+  loadModelFromUrl(m.url, m.name, m.ext, m.size, m.src);
+}
+
+function downloadEntry(i) {
+  const m = sessionModels[i];
+  triggerDownload(m.url, m.name);
+}
+
+/* ─── Three.js viewer ─────────────────────────────────────────────────── */
+let renderer, scene, camera, controls, animId;
+
+function initThree() {
+  const canvas = document.getElementById('three-canvas');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.setClearColor(0x010409);
+
+  scene = new THREE.Scene();
+
+  // Lumières
+  const amb = new THREE.AmbientLight(0xffffff, 0.7);
+  scene.add(amb);
+  const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+  dir.position.set(5, 10, 7);
+  scene.add(dir);
+  const dir2 = new THREE.DirectionalLight(0x88ccff, 0.4);
+  dir2.position.set(-5, -3, -5);
+  scene.add(dir2);
+
+  // Grille
+  const grid = new THREE.GridHelper(20, 20, 0x21262d, 0x21262d);
+  scene.add(grid);
+
+  const wrapper = document.getElementById('viewer-wrapper');
+  const w = wrapper.clientWidth, h = wrapper.clientHeight;
+  camera = new THREE.PerspectiveCamera(45, w/h, 0.01, 1000);
+  camera.position.set(0, 2, 5);
+
+  controls = new THREE.OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.07;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 1.2;
+
+  function animate() {
+    animId = requestAnimationFrame(animate);
+    controls.update();
+    renderer.setSize(wrapper.clientWidth, wrapper.clientHeight, false);
+    camera.aspect = wrapper.clientWidth / wrapper.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
+  }
+  animate();
+}
+
+function disposeViewer() {
+  if (animId) cancelAnimationFrame(animId);
+  if (renderer) { renderer.dispose(); renderer = null; }
+  scene = camera = controls = animId = null;
+}
+
+function fitCameraToObject(object) {
+  const box = new THREE.Box3().setFromObject(object);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = camera.fov * (Math.PI / 180);
+  let dist = Math.abs(maxDim / (2 * Math.tan(fov / 2)));
+  dist *= 1.6;
+  camera.position.set(center.x, center.y + maxDim * 0.3, center.z + dist);
+  camera.near = dist / 100;
+  camera.far = dist * 100;
+  camera.updateProjectionMatrix();
+  controls.target.copy(center);
+  controls.update();
+}
+
+function loadGLTF(urlOrBlob, onLoad, onError) {
+  const loader = new THREE.GLTFLoader();
+  loader.load(urlOrBlob, gltf => onLoad(gltf.scene), undefined, onError);
+}
+function loadOBJ(urlOrBlob, onLoad, onError) {
+  const loader = new THREE.OBJLoader();
+  loader.load(urlOrBlob, obj => onLoad(obj), undefined, onError);
+}
+function loadSTL(urlOrBlob, onLoad, onError) {
+  const loader = new THREE.STLLoader();
+  loader.load(urlOrBlob, geo => {
+    const mat = new THREE.MeshStandardMaterial({ color: 0x58a6ff, metalness: 0.2, roughness: 0.6 });
+    onLoad(new THREE.Mesh(geo, mat));
+  }, undefined, onError);
+}
+function loadPLY(urlOrBlob, onLoad, onError) {
+  const loader = new THREE.PLYLoader();
+  loader.load(urlOrBlob, geo => {
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({ color: 0x58a6ff, vertexColors: geo.hasAttribute('color') });
+    onLoad(new THREE.Mesh(geo, mat));
+  }, undefined, onError);
+}
+function loadDAE(urlOrBlob, onLoad, onError) {
+  const loader = new THREE.ColladaLoader();
+  loader.load(urlOrBlob, col => onLoad(col.scene), undefined, onError);
+}
+
+/* ─── Logique principale ──────────────────────────────────────────────── */
+let currentEntry = null;
+
+function loadModel() {
+  const url = document.getElementById('url-input').value.trim();
+  if (!url) { setStatus('⚠️ Colle d\'abord un lien.', 'error'); return; }
+  const ext = getExt(url);
+  if (!ext) {
+    setStatus('⚠️ Format non reconnu. Assure-toi que l\'URL contient l\'extension (.glb, .gltf, .obj…)', 'error');
+    return;
+  }
+  loadModelFromUrl(url, getName(url), ext, null, 'URL');
+}
+
+function loadModelFromUrl(url, name, ext, size, src) {
+  setStatus('<span class="spinner"></span> Chargement en cours…', 'loading');
+  document.getElementById('viewer-section').style.display = 'block';
+  document.getElementById('viewer-overlay').textContent = 'Chargement du modèle…';
+  document.getElementById('viewer-overlay').classList.remove('hidden');
+  document.getElementById('model-name').textContent = name;
+  document.getElementById('model-size').textContent = size ? fmtSize(size) : '…';
+
+  // Nettoyer l'ancien viewer
+  if (renderer) {
+    // Supprimer les anciens objets sauf lumières/grille
+    scene.children.filter(c => c.userData.isModel).forEach(c => scene.remove(c));
+  } else {
+    initThree();
+  }
+
+  currentEntry = { url, name, ext, size, src };
+
+  const onLoad = (object) => {
+    object.userData.isModel = true;
+    scene.add(object);
+    fitCameraToObject(object);
+    document.getElementById('viewer-overlay').classList.add('hidden');
+
+    // Récupérer la taille via fetch si inconnue
+    if (!size) {
+      fetch(url, { method: 'HEAD' }).then(r => {
+        const s = parseInt(r.headers.get('content-length') || '0');
+        if (s) {
+          currentEntry.size = s;
+          document.getElementById('model-size').textContent = fmtSize(s);
+          addToHistory({ ...currentEntry });
+        } else {
+          addToHistory({ ...currentEntry });
+        }
+      }).catch(() => addToHistory({ ...currentEntry }));
+    } else {
+      addToHistory({ ...currentEntry });
+    }
+
+    setStatus(`✅ Modèle chargé — <strong>${name}</strong>`, 'success');
+  };
+
+  const onError = (err) => {
+    console.error(err);
+    document.getElementById('viewer-overlay').textContent = '❌ Impossible de charger ce modèle.';
+    setStatus('❌ Erreur de chargement. Vérifie que le lien est direct et public (CORS autorisé).', 'error');
+  };
+
+  // Utilise un proxy CORS si nécessaire — tente d'abord l'URL directe
+  const loadWithExt = (u) => {
+    if (ext === '.glb' || ext === '.gltf') loadGLTF(u, onLoad, onError);
+    else if (ext === '.obj') loadOBJ(u, onLoad, onError);
+    else if (ext === '.stl') loadSTL(u, onLoad, onError);
+    else if (ext === '.ply') loadPLY(u, onLoad, onError);
+    else if (ext === '.dae') loadDAE(u, onLoad, onError);
+    else {
+      // FBX / USDZ → pas de loader natif Three.js sans module ES
+      setStatus('⚠️ FBX/USDZ non supportés dans cette version allégée. Convertis le lien en .glb.', 'error');
+    }
+  };
+
+  loadWithExt(url);
+}
+
+/* ─── Téléchargement ──────────────────────────────────────────────────── */
+function triggerDownload(url, filename) {
+  // Pour les blob URLs ou liens directs
+  if (url.startsWith('blob:')) {
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    return;
+  }
+  // Téléchargement via fetch → blob local (contourne certains Content-Disposition)
+  setStatus('<span class="spinner"></span> Préparation du téléchargement…', 'loading');
+  fetch(url)
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.blob();
+    })
+    .then(blob => {
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+      setStatus(`✅ Téléchargement lancé : <strong>${filename}</strong>`, 'success');
+    })
+    .catch(err => {
+      // Fallback : ouverture directe
+      window.open(url, '_blank');
+      setStatus('⚠️ Téléchargement direct impossible (CORS) — lien ouvert dans un nouvel onglet.', 'error');
+    });
+}
+
+function downloadCurrent() {
+  if (!currentEntry) return;
+  triggerDownload(currentEntry.url, currentEntry.name);
+}
+
+function resetViewer() {
+  document.getElementById('viewer-section').style.display = 'none';
+  disposeViewer();
+  currentEntry = null;
+  setStatus('');
+}
+
+/* ─── Fichier local (drag & drop) ────────────────────────────────────── */
+function handleFileInput(e) {
+  const file = e.target.files[0];
+  if (file) processLocalFile(file);
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.add('dragover');
+}
+function handleDragLeave() {
+  document.getElementById('drop-zone').classList.remove('dragover');
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) processLocalFile(file);
+}
+
+function processLocalFile(file) {
+  const ext = '.' + file.name.split('.').pop().toLowerCase();
+  if (!GOOD_EXTS.includes(ext)) {
+    setStatus('⚠️ Format non supporté : ' + ext, 'error'); return;
+  }
+  const blobUrl = URL.createObjectURL(file);
+  document.getElementById('url-input').value = '';
+  loadModelFromUrl(blobUrl, file.name, ext, file.size, 'Fichier local');
+  // Pour le fichier local on peut le télécharger directement depuis le blob
+  currentEntry = { url: blobUrl, name: file.name, ext, size: file.size, src: 'Fichier local' };
+}
+
+/* ─── Enter key ──────────────────────────────────────────────────────── */
+document.getElementById('url-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') loadModel();
+});
+</script>
+</body>
+</html>
